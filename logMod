@@ -1,0 +1,184 @@
+#!/bin/bash
+VERSION=1.0.0
+
+
+# Possible LogTypes defined here:
+LOG_FATAL=0
+LOG_ERROR=1
+LOG_WARNING=2
+LOG_INFO=4
+LOG_CUSTOM=64
+LOG_VERBOSE=128
+
+ACTIVE_LOGLEVEL=$(( $LOG_FATAL + $LOG_ERROR + $LOG_WARNING + $LOG_INFO + $LOG_CUSTOM )) # Set aktive LogLevel, FATAL can't be deactivated
+
+TYPE_LEN=12
+
+# Color settings
+format_BEGIN="\e[0;"
+format_END="m"
+color_DEFAULT="39"
+color_BLACK="30"
+color_RED="91"
+color_DARKRED="38;5;88"
+color_BLUE="34"
+color_PURPLE="38;5;99"
+color_GREEN="92"
+color_WHITE="97"
+color_YELLOW="93"
+color_ORANGE="38;5;202"
+background_DEFAULT="49"
+background_BLUE="44"
+background_RED="101"
+background_DARKRED="48;5;88"
+background_GREEN="102"
+background_WHITE="107"
+background_YELLOW="43"
+background_PURPLE="48;5;99"
+background_ORANGE="48;5;202"
+style_BOLD="1"
+style_BLINK="5"
+style_ULINE="4"
+format_RESET="\e[0m"
+
+COLOR_FATAL=${format_BEGIN}${background_DARKRED}";"${color_WHITE}";"${style_BOLD}";"${style_BLINK}$format_END
+COLOR_ERROR=${format_BEGIN}${background_RED}";"${color_BLACK}";"${style_BOLD}$format_END
+COLOR_WARNING=${format_BEGIN}${background_ORANGE}";"${color_BLACK}";"${style_BOLD}$format_END
+COLOR_INFO=${format_BEGIN}${background_WHITE}";"${color_GREEN}";"${style_BOLD}$format_END
+COLOR_CUSTOM=${format_BEGIN}${background_PURPLE}";"${color_WHITE}";"${style_BOLD}$format_END
+COLOR_VERBOSE=${format_BEGIN}${background_BLUE}";"${color_WHITE}";"${style_BOLD}$format_END
+TEXT_FATAL=${format_BEGIN}${color_DARKRED}$format_END
+TEXT_ERROR=${format_BEGIN}${color_RED}$format_END
+TEXT_WARNING=${format_BEGIN}${color_ORANGE}$format_END
+TEXT_INFO=${format_BEGIN}${color_WHITE}$format_END
+TEXT_CUSTOM=${format_BEGIN}${color_PURPLE}$format_END
+TEXT_VERBOSE=${format_BEGIN}${color_BLUE}$format_END
+
+
+function outMe(){
+    local outString="$1"
+
+    echo -e "$outString"
+}
+
+function setLogLevel(){
+  local logLevel="$1"
+
+  re='^[0-9]+$'
+  if [[ $logLevel =~ $re ]]; then
+    ACTIVE_LOGLEVEL=$logLevel
+  else
+    echo "Wrong Value: $logLevel, can't set Loglevel. Please select one of the following values or a combination from Level 0 to your specified loglevel: 0=FATAL, 1=ERROR, 2=WARNING, 4=INFO, 64=CUSTOM, 128=VERBOSE"
+  fi
+
+}
+
+function setTypeLen(){
+    local typeLength="$1"
+
+    re='^[0-9]+$'
+    if [[ $typeLength =~ $re ]]; then
+      TYPE_LEN=$typeLength    
+    else
+      echo "Wrong Value: $typeLength, can't set Length for Type Specification, continue with last value $TYPE_LEN"
+    fi
+}
+
+function repeatString(){
+    local repString="$1"
+    local repCount="$2"
+    local outString=""
+
+    case $repString in
+      "\s")
+        repString=" "
+        ;;
+      "\n")
+        repString="\n"
+        ;;
+    esac
+
+    re='^[0-9]+$'
+    if [[ $repCount =~ $re ]]; then
+      	for (( c=0; c<$repCount; c++ ));
+    do
+      echo -n "${repString}"
+    done 
+    else
+      echo "Wrong Value: $typeLength, is not a valid number to define how often the string will be repeated. Skip..."
+    fi
+}
+
+function repeatStringWithLb(){
+    echo $(repeatString "$1" "$2")
+}
+
+function buildTypeString(){
+    local type="${1}"
+    local typeLen=""
+
+    type=${type:0:$TYPE_LEN}
+    typeLen=${#type}
+
+    paddingRight=$(( ($TYPE_LEN - $typeLen) / 2 ))
+    paddingLeft=$(( $TYPE_LEN - $paddingRight - $typeLen ))
+
+    typeString=" ""$(repeatString ' ' $paddingLeft)"$type"$(repeatString ' ' $paddingRight)"" "
+
+    echo "$typeString"
+}
+
+function logMe(){
+    local type="$1"
+    local message="$2"
+    local type_specification="$3"
+    local outString=""
+
+   # if Message does not have an active Log-Level configured by the variable "ACTIVE_LOGLEVEL", exit the call now.
+   if [[ "$type" -gt "$ACTIVE_LOGLEVEL" ]]; then exit 0; fi
+
+    message=$(formatMessage "$message" $type_specification)
+
+    case $type in
+      $LOG_FATAL)
+        outString="$COLOR_FATAL""$(buildTypeString 'FATAL')""$format_RESET""  ""$TEXT_FATAL"$message$format_RESET
+        ;;
+      $LOG_ERROR)
+        outString="$COLOR_ERROR""$(buildTypeString 'ERROR')""$format_RESET""  ""$TEXT_ERROR"$message$format_RESET
+        ;;
+      $LOG_WARNING)
+        outString="$COLOR_WARNING""$(buildTypeString 'WARNING')""$format_RESET""  ""$TEXT_WARNING"$message$format_RESET
+        ;;
+      $LOG_INFO)
+        #outString="$COLOR_INFO""$(buildTypeString 'INFO')""$format_RESET""  ""$TEXT_INFO"$message$format_RESET
+        outString="$(repeatString ' ' $(($TYPE_LEN + 2)) )""$format_RESET""  ""$TEXT_INFO"$message$format_RESET
+        ;;
+      $LOG_CUSTOM)
+        outString="$COLOR_CUSTOM""$(buildTypeString $type_specification )""$format_RESET""  ""$TEXT_CUSTOM"$message$format_RESET
+        ;;
+      $LOG_VERBOSE)
+        outString="$COLOR_VERBOSE""$(buildTypeString 'VERBOSE')""$format_RESET""  ""$TEXT_VERBOSE"$message$format_RESET
+        ;;
+      *)
+        ;;
+    esac
+
+    outMe "$outString"
+}
+
+function formatMessage(){
+  local message="$1"
+  local type_specification="$2"
+  local colCount=$(( $(tput cols) - $TYPE_LEN - 4))
+  local spacing="$(repeatString ' ' $(($TYPE_LEN + 4)) )"
+  local outputString=""
+
+  if [[ -z $type_specification ]]; then
+    outputString=$(printf "$message" | fold -w $colCount | sed -e ':a' -e 'N' -e '$!ba' -e "s/\n/\n${spacing}/g" | sed "s/${spacing}\s/${spacing}/g")
+  else
+    tempLabel="$(buildTypeString $type_specification )"
+    outputString=$(printf "$message" | fold -w $colCount | sed -e ':a' -e 'N' -e '$!ba' -e "s/\n/\n""$tempLabel  ""/g" | sed "s/$tempLabel\s\s*/${tempLabel}  /g")
+  fi
+
+  echo -e "$outputString"
+}
