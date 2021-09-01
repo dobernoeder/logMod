@@ -135,7 +135,7 @@ function logMe(){
     local outString=""
 
    # if Message does not have an active Log-Level configured by the variable "ACTIVE_LOGLEVEL", exit the call now.
-   if [[ "$type" -gt "$ACTIVE_LOGLEVEL" ]]; then exit 0; fi
+   if [[ "$type" -gt "$ACTIVE_LOGLEVEL" ]]; then return 0; fi
 
     message=$(formatMessage "$message" $type_specification)
 
