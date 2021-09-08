@@ -10,8 +10,13 @@ LOG_INFO=4
 LOG_CUSTOM=64
 LOG_VERBOSE=128
 
-ACTIVE_LOGLEVEL=$(( $LOG_FATAL + $LOG_ERROR + $LOG_WARNING + $LOG_INFO + $LOG_CUSTOM )) # Set aktive LogLevel, FATAL can't be deactivated
+# Possible LogModes defined here:
+LOGMODE_PLAIN=0
+LOGMODE_SIMPLE=1
+LOGMODE_MODERN=2
 
+ACTIVE_LOGLEVEL=$(( $LOG_FATAL + $LOG_ERROR + $LOG_WARNING + $LOG_INFO + $LOG_CUSTOM )) # Set aktive LogLevel, FATAL can't be deactivated
+ACTIVE_LOGMODE=$LOGMODE_MODERN
 TYPE_LEN=12
 
 # Color settings
@@ -71,6 +76,16 @@ function setLogLevel(){
     echo "Wrong Value: $logLevel, can't set Loglevel. Please select one of the following values or a combination from Level 0 to your specified loglevel: 0=FATAL, 1=ERROR, 2=WARNING, 4=INFO, 64=CUSTOM, 128=VERBOSE"
   fi
 
+}
+
+function setLogMode(){
+  local logMode="$1"
+
+  if [[ "$logMode" -le "2" ]]; then
+    ACTIVE_LOGMODE="$logMode"
+  else
+    echo "Invalid Mode requested: Cant change output mode for log to $logLevel, this value is not valid"
+  fi
 }
 
 function setTypeLen(){
@@ -137,33 +152,64 @@ function logMe(){
    # if Message does not have an active Log-Level configured by the variable "ACTIVE_LOGLEVEL", exit the call now.
    if [[ "$type" -gt "$ACTIVE_LOGLEVEL" ]]; then return 0; fi
 
-    message=$(formatMessage "$message" $type_specification)
+   if [[ "$ACTIVE_LOGMODE" == "$LOGMODE_PLAIN" ]]; then
+     outMe "$message"
+   fi
+   if [[ "$ACTIVE_LOGMODE" == "$LOGMODE_SIMPLE" ]]; then
+     case $type in
+       $LOG_FATAL)
+         outString="[ $(buildTypeString 'FATAL') ]  $message"
+         ;;
+       $LOG_ERROR)
+         outString="[ $(buildTypeString 'ERROR') ]  $message"
+         ;;
+       $LOG_WARNING)
+         outString="[ $(buildTypeString 'WARNING') ]  $message"
+         ;;
+       $LOG_INFO)
+         outString="[ $(buildTypeString 'INFO') ]  $message"
+         ;;
+       $LOG_CUSTOM)
+         outString="[ $(buildTypeString $type_specification ) ]  $message"
+         ;;
+       $LOG_VERBOSE)
+         outString="[ $(buildTypeString 'VERBOSE') ]  $message"
+         ;;
+       *)
+         ;;
+     esac
 
-    case $type in
-      $LOG_FATAL)
-        outString="$COLOR_FATAL""$(buildTypeString 'FATAL')""$format_RESET""  ""$TEXT_FATAL"$message$format_RESET
-        ;;
-      $LOG_ERROR)
-        outString="$COLOR_ERROR""$(buildTypeString 'ERROR')""$format_RESET""  ""$TEXT_ERROR"$message$format_RESET
-        ;;
-      $LOG_WARNING)
-        outString="$COLOR_WARNING""$(buildTypeString 'WARNING')""$format_RESET""  ""$TEXT_WARNING"$message$format_RESET
-        ;;
-      $LOG_INFO)
-        #outString="$COLOR_INFO""$(buildTypeString 'INFO')""$format_RESET""  ""$TEXT_INFO"$message$format_RESET
-        outString="$(repeatString ' ' $(($TYPE_LEN + 2)) )""$format_RESET""  ""$TEXT_INFO"$message$format_RESET
-        ;;
-      $LOG_CUSTOM)
-        outString="$COLOR_CUSTOM""$(buildTypeString $type_specification )""$format_RESET""  ""$TEXT_CUSTOM"$message$format_RESET
-        ;;
-      $LOG_VERBOSE)
-        outString="$COLOR_VERBOSE""$(buildTypeString 'VERBOSE')""$format_RESET""  ""$TEXT_VERBOSE"$message$format_RESET
-        ;;
-      *)
-        ;;
-    esac
+     outMe "$outString"
+   fi
+   if [[ "$ACTIVE_LOGMODE" == "$LOGMODE_MODERN" ]]; then
+     message=$(formatMessage "$message" $type_specification)
 
-    outMe "$outString"
+     case $type in
+       $LOG_FATAL)
+         outString="$COLOR_FATAL""$(buildTypeString 'FATAL')""$format_RESET""  ""$TEXT_FATAL"$message$format_RESET
+         ;;
+       $LOG_ERROR)
+         outString="$COLOR_ERROR""$(buildTypeString 'ERROR')""$format_RESET""  ""$TEXT_ERROR"$message$format_RESET
+         ;;
+       $LOG_WARNING)
+         outString="$COLOR_WARNING""$(buildTypeString 'WARNING')""$format_RESET""  ""$TEXT_WARNING"$message$format_RESET
+         ;;
+       $LOG_INFO)
+         outString="$COLOR_INFO""$(buildTypeString 'INFO')""$format_RESET""  ""$TEXT_INFO"$message$format_RESET
+         #outString="$(repeatString ' ' $(($TYPE_LEN + 2)) )""$format_RESET""  ""$TEXT_INFO"$message$format_RESET
+         ;;
+       $LOG_CUSTOM)
+         outString="$COLOR_CUSTOM""$(buildTypeString $type_specification )""$format_RESET""  ""$TEXT_CUSTOM"$message$format_RESET
+         ;;
+       $LOG_VERBOSE)
+         outString="$COLOR_VERBOSE""$(buildTypeString 'VERBOSE')""$format_RESET""  ""$TEXT_VERBOSE"$message$format_RESET
+         ;;
+       *)
+         ;;
+     esac
+
+     outMe "$outString"
+   fi
 }
 
 function formatMessage(){
